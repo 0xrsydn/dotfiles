@@ -5,6 +5,8 @@ Installed roles:
 - `reviewer` — review changes, bugs, risks, maintainability
 - `librarian` — explore and map a codebase
 - `uiux-designer` — UI/UX design direction, flows, states, and implementation guidance
+- `executor` — implement ordered coding tasks from a defined todo list
+- `planner` — interactive planning specialist that can ask clarifying questions and return an ordered executor-ready todo list
 
 ## Commands
 
@@ -16,6 +18,16 @@ Installed roles:
 - `Use the subagent tool with reviewer to inspect the auth refactor.`
 - `Use subagent in parallel: librarian maps the settings flow, uiux-designer proposes an improved UX direction, reviewer lists product and implementation risks.`
 - `Chain librarian -> uiux-designer to redesign onboarding. Use {previous} in the second task.`
+- `Use executor to implement this ordered todo list exactly as written, then summarize what was completed and validated.`
+- `Use planner to clarify ambiguity only when needed and output an ordered implementation todo list for executor handoff.`
+
+## Interactive planner + ask_user
+
+`planner` is marked `interactive: true` and runs through an RPC-backed child agent path.
+
+- Interactive child agents use a helper extension tool: `ask_user`
+- `ask_user` supports `input`, `confirm`, and `select` modes (plus `editor`)
+- Child tool activation is applied on `session_start` via `PI_SUBAGENT_TOOLS` so custom tools like `ask_user` are reliably active
 
 ## Notes
 
@@ -26,3 +38,11 @@ Installed roles:
 - `reviewer` uses `openai-codex/gpt-5.4:xhigh`
 - `librarian` uses `anthropic/claude-sonnet-4-6`
 - `uiux-designer` uses `google-antigravity/gemini-3.1-pro-high`
+- `executor` uses `openai-codex/gpt-5.3-codex:high`
+- `planner` uses `anthropic/claude-sonnet-4-6`
+
+## Current interactive limitations
+
+- Interactive subagents are currently supported only in **single mode** (`{ agent, task }`)
+- Interactive subagents are currently rejected in **parallel** and **chain** modes
+- Interactive subagents require `ctx.hasUI` (interactive TUI or RPC mode with extension UI handling)

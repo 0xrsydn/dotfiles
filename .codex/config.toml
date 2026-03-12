@@ -11,6 +11,9 @@ network_access = true
 [projects."/home/rsydn"]
 trust_level = "trusted"
 
+[projects."/home/rsydn/Projects/Collab/trafalgar-law"]
+trust_level = "trusted"
+
 [notice.model_migrations]
 "gpt-5.3-codex" = "gpt-5.4"
 

@@ -2,52 +2,26 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message } from "@mariozechner/pi-ai";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { type AgentConfig, type AgentScope, discoverAgents, formatAgentList } from "./agents.js";
+import { runInteractiveAgentRpc } from "./rpc-runner.js";
+import {
+	applyAssistantUsage,
+	createEmptyUsageStats,
+	getDisplayItems,
+	getFinalOutput,
+	type DisplayItem,
+	type OnUpdateCallback,
+	type SingleResult,
+	type SubagentDetails,
+} from "./subagent-types.js";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
-
-interface UsageStats {
-	input: number;
-	output: number;
-	cacheRead: number;
-	cacheWrite: number;
-	cost: number;
-	contextTokens: number;
-	turns: number;
-}
-
-interface SingleResult {
-	agent: string;
-	agentSource: "user" | "project" | "unknown";
-	task: string;
-	exitCode: number;
-	messages: Message[];
-	stderr: string;
-	usage: UsageStats;
-	model?: string;
-	stopReason?: string;
-	errorMessage?: string;
-	step?: number;
-}
-
-interface SubagentDetails {
-	mode: "single" | "parallel" | "chain";
-	agentScope: AgentScope;
-	projectAgentsDir: string | null;
-	results: SingleResult[];
-}
-
-type ToolContent = Array<{ type: "text"; text: string }>;
-type ToolUpdate = { content: ToolContent; details?: SubagentDetails; isError?: boolean };
-type OnUpdateCallback = (partial: ToolUpdate) => void;
-type DisplayItem = { type: "text"; text: string } | { type: "toolCall"; name: string; args: Record<string, any> };
 
 function formatTokens(count: number): string {
 	if (count < 1000) return count.toString();
@@ -144,31 +118,6 @@ function formatToolCall(
 	}
 }
 
-function getFinalOutput(messages: Message[]): string {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const msg = messages[i];
-		if (msg.role === "assistant") {
-			for (const part of msg.content) {
-				if (part.type === "text") return part.text;
-			}
-		}
-	}
-	return "";
-}
-
-function getDisplayItems(messages: Message[]): DisplayItem[] {
-	const items: DisplayItem[] = [];
-	for (const msg of messages) {
-		if (msg.role === "assistant") {
-			for (const part of msg.content) {
-				if (part.type === "text") items.push({ type: "text", text: part.text });
-				else if (part.type === "toolCall") items.push({ type: "toolCall", name: part.name, args: part.arguments });
-			}
-		}
-	}
-	return items;
-}
-
 async function mapWithConcurrencyLimit<TIn, TOut>(
 	items: TIn[],
 	concurrency: number,
@@ -218,7 +167,7 @@ async function runSingleAgent(
 			exitCode: 1,
 			messages: [],
 			stderr: `Unknown agent: "${agentName}". Available agents: ${available}.`,
-			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+			usage: createEmptyUsageStats(),
 			step,
 		};
 	}
@@ -237,7 +186,7 @@ async function runSingleAgent(
 		exitCode: 0,
 		messages: [],
 		stderr: "",
-		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+		usage: createEmptyUsageStats(),
 		model: agent.model,
 		step,
 	};
@@ -275,28 +224,14 @@ async function runSingleAgent(
 				}
 
 				if (event.type === "message_end" && event.message) {
-					const msg = event.message as Message;
+					const msg = event.message;
 					currentResult.messages.push(msg);
-					if (msg.role === "assistant") {
-						currentResult.usage.turns++;
-						const usage = msg.usage;
-						if (usage) {
-							currentResult.usage.input += usage.input || 0;
-							currentResult.usage.output += usage.output || 0;
-							currentResult.usage.cacheRead += usage.cacheRead || 0;
-							currentResult.usage.cacheWrite += usage.cacheWrite || 0;
-							currentResult.usage.cost += usage.cost?.total || 0;
-							currentResult.usage.contextTokens = usage.totalTokens || 0;
-						}
-						if (!currentResult.model && msg.model) currentResult.model = msg.model;
-						if (msg.stopReason) currentResult.stopReason = msg.stopReason;
-						if (msg.errorMessage) currentResult.errorMessage = msg.errorMessage;
-					}
+					applyAssistantUsage(currentResult, msg);
 					emitUpdate();
 				}
 
 				if (event.type === "tool_result_end" && event.message) {
-					currentResult.messages.push(event.message as Message);
+					currentResult.messages.push(event.message);
 					emitUpdate();
 				}
 			};
@@ -349,6 +284,10 @@ async function runSingleAgent(
 	}
 }
 
+function findAgentConfig(agents: AgentConfig[], name: string): AgentConfig | undefined {
+	return agents.find((agent) => agent.name === name);
+}
+
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
@@ -396,7 +335,7 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Delegate work to specialized subagents with isolated context.",
 			"Supports single, parallel, and chained execution.",
-			"Useful built-in roles: reviewer, librarian, uiux-designer.",
+			"Useful built-in roles: reviewer, librarian, uiux-designer, executor.",
 			'Default scope is "user" (~/.pi/agent/agents). Set agentScope to "both" or "project" to include repo-local agents.',
 		].join(" "),
 		parameters: SubagentParams,
@@ -427,6 +366,33 @@ export default function (pi: ExtensionAPI) {
 					content: [{ type: "text", text: `Invalid parameters. Available agents: ${availableAgents.text}` }],
 					details: makeDetails("single")([]),
 				};
+			}
+
+			if (hasTasks && params.tasks?.some((task) => findAgentConfig(agents, task.agent)?.interactive === true)) {
+				return {
+					content: [{ type: "text", text: "Interactive subagents are currently supported only in single mode." }],
+					details: makeDetails("parallel")([]),
+					isError: true,
+				};
+			}
+
+			if (hasChain && params.chain?.some((step) => findAgentConfig(agents, step.agent)?.interactive === true)) {
+				return {
+					content: [{ type: "text", text: "Interactive subagents are currently supported only in single mode." }],
+					details: makeDetails("chain")([]),
+					isError: true,
+				};
+			}
+
+			if (hasSingle) {
+				const selectedAgent = params.agent ? findAgentConfig(agents, params.agent) : undefined;
+				if (selectedAgent?.interactive === true && !ctx.hasUI) {
+					return {
+						content: [{ type: "text", text: "Interactive subagents require a UI-enabled session." }],
+						details: makeDetails("single")([]),
+						isError: true,
+					};
+				}
 			}
 
 			if ((agentScope === "project" || agentScope === "both") && confirmProjectAgents && ctx.hasUI) {
@@ -521,7 +487,7 @@ export default function (pi: ExtensionAPI) {
 						exitCode: -1,
 						messages: [],
 						stderr: "",
-						usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+						usage: createEmptyUsageStats(),
 					};
 				}
 
@@ -571,17 +537,31 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (params.agent && params.task) {
-				const result = await runSingleAgent(
-					ctx.cwd,
-					agents,
-					params.agent,
-					params.task,
-					params.cwd,
-					undefined,
-					signal,
-					onUpdate as OnUpdateCallback | undefined,
-					makeDetails("single"),
-				);
+				const selectedAgent = findAgentConfig(agents, params.agent);
+				const result = selectedAgent?.interactive
+					? await runInteractiveAgentRpc(
+							ctx.cwd,
+							agents,
+							params.agent,
+							params.task,
+							params.cwd,
+							undefined,
+							signal,
+							onUpdate as OnUpdateCallback | undefined,
+							makeDetails("single"),
+							ctx,
+					  )
+					: await runSingleAgent(
+							ctx.cwd,
+							agents,
+							params.agent,
+							params.task,
+							params.cwd,
+							undefined,
+							signal,
+							onUpdate as OnUpdateCallback | undefined,
+							makeDetails("single"),
+					  );
 				const isError = result.exitCode !== 0 || result.stopReason === "error" || result.stopReason === "aborted";
 				if (isError) {
 					const errorMsg = result.errorMessage || result.stderr || getFinalOutput(result.messages) || "(no output)";

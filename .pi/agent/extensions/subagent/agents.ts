@@ -9,6 +9,7 @@ export interface AgentConfig {
 	description: string;
 	tools?: string[];
 	model?: string;
+	interactive?: boolean;
 	systemPrompt: string;
 	source: "user" | "project";
 	filePath: string;
@@ -17,6 +18,55 @@ export interface AgentConfig {
 export interface AgentDiscoveryResult {
 	agents: AgentConfig[];
 	projectAgentsDir: string | null;
+}
+
+function normalizeString(value: unknown): string | undefined {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length > 0 ? trimmed : undefined;
+	}
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	return undefined;
+}
+
+function normalizeTools(value: unknown): string[] | undefined {
+	if (Array.isArray(value)) {
+		const tools = value
+			.flatMap((entry) => {
+				if (typeof entry !== "string") return [];
+				return entry
+					.split(",")
+					.map((part) => part.trim())
+					.filter(Boolean);
+			})
+			.filter(Boolean);
+		return tools.length > 0 ? tools : undefined;
+	}
+
+	if (typeof value === "string") {
+		const tools = value
+			.split(",")
+			.map((tool) => tool.trim())
+			.filter(Boolean);
+		return tools.length > 0 ? tools : undefined;
+	}
+
+	return undefined;
+}
+
+function normalizeBoolean(value: unknown): boolean | undefined {
+	if (typeof value === "boolean") return value;
+	if (typeof value === "number") {
+		if (value === 1) return true;
+		if (value === 0) return false;
+		return undefined;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (["true", "1", "yes", "y", "on"].includes(normalized)) return true;
+		if (["false", "0", "no", "n", "off"].includes(normalized)) return false;
+	}
+	return undefined;
 }
 
 function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig[] {
@@ -42,19 +92,17 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 			continue;
 		}
 
-		const { frontmatter, body } = parseFrontmatter<Record<string, string>>(content);
-		if (!frontmatter.name || !frontmatter.description) continue;
-
-		const tools = frontmatter.tools
-			?.split(",")
-			.map((t: string) => t.trim())
-			.filter(Boolean);
+		const { frontmatter, body } = parseFrontmatter<Record<string, unknown>>(content);
+		const name = normalizeString(frontmatter.name);
+		const description = normalizeString(frontmatter.description);
+		if (!name || !description) continue;
 
 		agents.push({
-			name: frontmatter.name,
-			description: frontmatter.description,
-			tools: tools && tools.length > 0 ? tools : undefined,
-			model: frontmatter.model,
+			name,
+			description,
+			tools: normalizeTools(frontmatter.tools),
+			model: normalizeString(frontmatter.model),
+			interactive: normalizeBoolean(frontmatter.interactive),
 			systemPrompt: body,
 			source,
 			filePath,
@@ -109,7 +157,7 @@ export function formatAgentList(agents: AgentConfig[], maxItems: number): { text
 	const listed = agents.slice(0, maxItems);
 	const remaining = agents.length - listed.length;
 	return {
-		text: listed.map((a) => `${a.name} (${a.source}): ${a.description}`).join("; "),
+		text: listed.map((agent) => `${agent.name} (${agent.source}): ${agent.description}`).join("; "),
 		remaining,
 	};
 }
