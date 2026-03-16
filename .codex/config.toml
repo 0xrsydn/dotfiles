@@ -4,6 +4,7 @@ web_search = "cached"
 model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "xhigh"
 personality = "pragmatic"
+service_tier = "fast"
 
 [sandbox_workspace_write]
 network_access = true
@@ -12,6 +13,15 @@ network_access = true
 trust_level = "trusted"
 
 [projects."/home/rsydn/Projects/Collab/trafalgar-law"]
+trust_level = "trusted"
+
+[projects."/home/rsydn/Projects/Personal/clan-private"]
+trust_level = "trusted"
+
+[projects."/home/rsydn/Projects/Personal/rasyidan-personal-web"]
+trust_level = "trusted"
+
+[projects."/home/rsydn/Projects/Personal/autodegen"]
 trust_level = "trusted"
 
 [notice.model_migrations]

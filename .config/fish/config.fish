@@ -12,3 +12,4 @@ set -gx PATH ~/.npm-global/bin $PATH
 if status is-interactive
     direnv hook fish | source
 end
+fish_add_path /opt/cuda/bin
