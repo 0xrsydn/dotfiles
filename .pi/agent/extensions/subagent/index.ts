@@ -335,7 +335,7 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Delegate work to specialized subagents with isolated context.",
 			"Supports single, parallel, and chained execution.",
-			"Useful built-in roles: reviewer, librarian, uiux-designer, executor.",
+			"Useful built-in roles: reviewer, librarian, design-engineer, executor.",
 			'Default scope is "user" (~/.pi/agent/agents). Set agentScope to "both" or "project" to include repo-local agents.',
 		].join(" "),
 		parameters: SubagentParams,

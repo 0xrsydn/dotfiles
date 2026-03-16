@@ -4,7 +4,7 @@ Installed roles:
 
 - `reviewer` — review changes, bugs, risks, maintainability
 - `librarian` — explore and map a codebase
-- `uiux-designer` — UI/UX design direction, flows, states, and implementation guidance
+- `design-engineer` — frontend-aware UI/UX direction, design systems, and implementation-ready recommendations
 - `executor` — implement ordered coding tasks from a defined todo list
 - `planner` — interactive planning specialist that can ask clarifying questions and return an ordered executor-ready todo list
 
@@ -16,8 +16,8 @@ Installed roles:
 ## Example prompts
 
 - `Use the subagent tool with reviewer to inspect the auth refactor.`
-- `Use subagent in parallel: librarian maps the settings flow, uiux-designer proposes an improved UX direction, reviewer lists product and implementation risks.`
-- `Chain librarian -> uiux-designer to redesign onboarding. Use {previous} in the second task.`
+- `Use subagent in parallel: librarian maps the settings flow, design-engineer proposes an improved UX direction, reviewer lists product and implementation risks.`
+- `Chain librarian -> design-engineer to redesign onboarding. Use {previous} in the second task.`
 - `Use executor to implement this ordered todo list exactly as written, then summarize what was completed and validated.`
 - `Use planner to clarify ambiguity only when needed and output an ordered implementation todo list for executor handoff.`
 
@@ -37,7 +37,7 @@ Installed roles:
 - Parallel mode allows up to 8 tasks and runs up to 4 concurrently
 - `reviewer` uses `openai-codex/gpt-5.4:xhigh`
 - `librarian` uses `anthropic/claude-sonnet-4-6`
-- `uiux-designer` uses `google-antigravity/gemini-3.1-pro-high`
+- `design-engineer` uses `google-antigravity/gemini-3-flash`
 - `executor` uses `openai-codex/gpt-5.3-codex:high`
 - `planner` uses `anthropic/claude-sonnet-4-6`
 
