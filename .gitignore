@@ -1,0 +1,74 @@
+# Bare-home dotfiles: ignore all untracked files by default.
+# Add new dotfiles explicitly with `dotfiles add -f <path>`.
+*
+
+# Secrets and machine-local state
+.config/fish/fish_variables
+.pi/agent/auth.json
+.pi/agent/sessions/
+.pi/pi-acp/session-map.json
+
+# Environment files / credentials
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+*.age
+*.kdbx
+*credentials*
+*secrets*
+*token*
+
+# Private auth/config directories
+.ssh/
+.gnupg/
+.kube/
+.aws/
+.azure/
+.gcloud/
+.docker/config.json
+.netrc
+.npmrc
+.pypirc
+.huggingface/token
+
+# Shell/app history
+.bash_history
+.zsh_history
+.python_history
+.lesshst
+.mysql_history
+.psql_history
+.sqlite_history
+.wget-hsts
+
+# Pi extension/package build artifacts
+.pi/agent/extensions/*/node_modules/
+.pi/agent/extensions/*/package-lock.json
+.pi/agent/npm/node_modules/
+.pi/agent/npm/package-lock.json
+
+# Logs / ephemeral databases / sessions
+*.log
+*.jsonl
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Caches and generated local state
+.cache/
+.local/share/Trash/
+.local/state/
+.tmp/
+tmp/
+
+# Common dependency folders
+node_modules/
