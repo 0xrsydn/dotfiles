@@ -1,11 +1,20 @@
 {
-  "lastChangelogVersion": "0.79.9",
+  "lastChangelogVersion": "0.87.1",
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
-  "defaultThinkingLevel": "low",
+  "defaultModel": "gpt-6-sol",
+  "defaultThinkingLevel": "medium",
   "theme": "catppuccin-mocha",
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "packages": [
-    "npm:@ff-labs/pi-fff"
-  ]
+    "npm:@ff-labs/pi-fff",
+    "git:github.com/algal/pi-openai-server-compaction"
+  ],
+  "compaction": {
+    "modelOverrides": {
+      "bonsai/bonsai-27b": {
+        "reserveTokens": 2048,
+        "keepRecentTokens": 8192
+      }
+    }
+  }
 }
