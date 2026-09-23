@@ -8,6 +8,15 @@
 .pi/agent/sessions/
 .pi/pi-acp/session-map.json
 
+# sops vault + age identity — NEVER commit these
+# (the vault is encrypted, but its age private key must stay off any remote)
+.secrets/
+.config/sops/
+*.enc.env
+*.enc.yaml
+*.enc.yml
+*.enc.json
+
 # Environment files / credentials
 .env
 .env.*
@@ -52,6 +61,14 @@
 .pi/agent/extensions/*/package-lock.json
 .pi/agent/npm/node_modules/
 .pi/agent/npm/package-lock.json
+
+# Pi machine-local state (not portable config)
+.pi/agent/git/
+.pi/agent/fff/
+.pi/agent/trust.json
+
+# Nested git repo (caelestia shell), not a submodule
+.config/quickshell/caelestia/
 
 # Logs / ephemeral databases / sessions
 *.log
