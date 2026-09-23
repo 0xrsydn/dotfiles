@@ -1,0 +1,5 @@
+#:schema https://docs.jj-vcs.dev/latest/config-schema.json
+
+[user]
+name = "0xrsydn"
+email = "rafayrussani@gmail.com"
