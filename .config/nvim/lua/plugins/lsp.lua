@@ -17,8 +17,10 @@ return {
       -- - install language servers with nix profile / flake / devShell
       -- - start Neovim from a direnv-loaded shell
       -- - Neovim uses server binaries from PATH only
-      local lspconfig = require("lspconfig")
-      local util = require("lspconfig.util")
+      --
+      -- Uses the Neovim 0.11+ `vim.lsp.config` / `vim.lsp.enable` API.
+      -- nvim-lspconfig ships the per-server defaults in its `lsp/` directory,
+      -- which `vim.lsp.config(name, ...)` deep-merges over.
 
       vim.diagnostic.config({
         severity_sort = true,
@@ -60,89 +62,88 @@ return {
         capabilities = blink.get_lsp_capabilities(capabilities)
       end
 
+      -- Applied to every server. Per-server `config` below is deep-merged in.
+      vim.lsp.config("*", { capabilities = capabilities })
+
+      -- `bin` is only used to check PATH; `config` is passed to vim.lsp.config.
+      local servers = {
+        lua_ls = {
+          bin = "lua-language-server",
+          config = {
+            settings = {
+              Lua = {
+                completion = { callSnippet = "Replace" },
+                diagnostics = { globals = { "vim" } },
+                telemetry = { enable = false },
+                workspace = { checkThirdParty = false },
+              },
+            },
+          },
+        },
+        nixd = { bin = "nixd" },
+        bashls = { bin = "bash-language-server" },
+        marksman = { bin = "marksman" },
+        ts_ls = { bin = "typescript-language-server" },
+        gopls = {
+          bin = "gopls",
+          config = {
+            settings = {
+              gopls = {
+                gofumpt = true,
+                analyses = {
+                  unusedparams = true,
+                },
+                staticcheck = true,
+              },
+            },
+          },
+        },
+        rust_analyzer = {
+          bin = "rust-analyzer",
+          config = {
+            settings = {
+              ["rust-analyzer"] = {
+                cargo = {
+                  allFeatures = true,
+                },
+                checkOnSave = {
+                  command = "clippy",
+                },
+              },
+            },
+          },
+        },
+        pyright = {
+          bin = "pyright-langserver",
+          config = {
+            settings = {
+              python = {
+                analysis = {
+                  autoSearchPaths = true,
+                  useLibraryCodeForTypes = true,
+                  diagnosticMode = "workspace",
+                },
+              },
+            },
+          },
+        },
+      }
+
       local missing = {}
+      local enabled = {}
 
-      local function setup(server, bin, config)
-        config = config or {}
-        config.capabilities = vim.tbl_deep_extend("force", capabilities, config.capabilities or {})
-
-        if vim.fn.executable(bin) ~= 1 then
-          table.insert(missing, string.format("%s (%s)", server, bin))
-          return
+      for name, spec in pairs(servers) do
+        if vim.fn.executable(spec.bin) ~= 1 then
+          table.insert(missing, string.format("%s (%s)", name, spec.bin))
+        else
+          vim.lsp.config(name, spec.config or {})
+          table.insert(enabled, name)
         end
-
-        lspconfig[server].setup(config)
       end
 
-      setup("lua_ls", "lua-language-server", {
-        cmd = { "lua-language-server" },
-        settings = {
-          Lua = {
-            completion = { callSnippet = "Replace" },
-            diagnostics = { globals = { "vim" } },
-            telemetry = { enable = false },
-            workspace = { checkThirdParty = false },
-          },
-        },
-      })
-
-      setup("nixd", "nixd", {
-        cmd = { "nixd" },
-      })
-
-      setup("bashls", "bash-language-server", {
-        cmd = { "bash-language-server", "start" },
-      })
-
-      setup("marksman", "marksman", {
-        cmd = { "marksman", "server" },
-      })
-
-      setup("ts_ls", "typescript-language-server", {
-        cmd = { "typescript-language-server", "--stdio" },
-        root_dir = util.root_pattern("tsconfig.json", "jsconfig.json", "package.json", ".git"),
-        single_file_support = false,
-      })
-
-      setup("gopls", "gopls", {
-        cmd = { "gopls" },
-        settings = {
-          gopls = {
-            gofumpt = true,
-            analyses = {
-              unusedparams = true,
-            },
-            staticcheck = true,
-          },
-        },
-      })
-
-      setup("rust_analyzer", "rust-analyzer", {
-        cmd = { "rust-analyzer" },
-        settings = {
-          ["rust-analyzer"] = {
-            cargo = {
-              allFeatures = true,
-            },
-            checkOnSave = {
-              command = "clippy",
-            },
-          },
-        },
-      })
-
-      setup("pyright", "pyright-langserver", {
-        cmd = { "pyright-langserver", "--stdio" },
-        settings = {
-          python = {
-            analysis = {
-              autoSearchPaths = true,
-              useLibraryCodeForTypes = true,
-              diagnosticMode = "workspace",
-            },
-          },
-        },
-      })
+      if #enabled > 0 then
+        vim.lsp.enable(enabled)
+      end
 
       if #missing > 0 and #vim.api.nvim_list_uis() > 0 then
         vim.schedule(function()
